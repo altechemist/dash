@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import { PayPalButtons, PayPalScriptProvider } from "@paypal/react-paypal-js";
-import { useDispatch } from "react-redux";
+import { useDispatch, useSelector } from "react-redux";
 import { createOrder } from "../store/orderSlice";
+import { AppDispatch, RootState } from "../store/store";
 
 interface PayPalButtonComponentProps {
   formData: {
@@ -15,34 +16,47 @@ interface PayPalButtonComponentProps {
     state: string;
     zip: string;
   };
-  cart: Array<{ productId: string; quantity: number }>;
 }
 
-const PayPalButtonComponent: React.FC<PayPalButtonComponentProps> = ({ formData, cart }) => {
-  const dispatch = useDispatch();
-  const [amount, setAmount] = useState<string>("0.01");
+const PayPalButtonComponent: React.FC<PayPalButtonComponentProps> = ({
+  formData,
+}) => {
+  const dispatch = useDispatch<AppDispatch>();
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<boolean>(false);
 
-  useEffect(() => {
-    // Calculate the total amount (you can implement your calculation logic here)
-    const totalAmount = cart.reduce((total, item) => total + item.quantity * 10, 0); // Example price: 10 USD per item
-    setAmount(totalAmount.toFixed(2));
-  }, [cart]);
+  // Get cart and subtotal from Redux store
+  const cart = useSelector((state: RootState) => state.cart.cart);
+  const subtotal = Number(useSelector((state: RootState) => state.cart.subtotal));
 
+  // Get user from Redux store
+  const { user } = useSelector((state: RootState) => state.user);
+
+  // Function to create the order in PayPal
   const onCreateOrder = (data: any, actions: any) => {
+    // Check if subtotal is valid and greater than zero
+    
+    if (!Number(subtotal) || Number(subtotal) <= 0) {
+      setError(`Invalid subtotal: ${subtotal}. Please check your cart.`);
+      return;
+    }
+
+    // Ensure two decimal precision for subtotal
+    const totalAmount = subtotal.toFixed(2); // Round to 2 decimal places
+
     return actions.order.create({
       purchase_units: [
         {
           amount: {
-            value: amount,
+            value: totalAmount, // Use rounded value
           },
         },
       ],
     });
   };
 
+  // Function to handle the approval of the order
   const onApproveOrder = (data: any, actions: any) => {
     setLoading(true);
     return actions.order
@@ -52,8 +66,8 @@ const PayPalButtonComponent: React.FC<PayPalButtonComponentProps> = ({ formData,
         alert(`Transaction completed by ${name}`);
 
         const order = {
-          userId: "userId",
-          items: cart,
+          userId: user?.uid || "guest",
+          items: cart?.items || [],
           status: "Completed",
           billingInfo: formData,
           createdAt: new Date(),
@@ -65,8 +79,11 @@ const PayPalButtonComponent: React.FC<PayPalButtonComponentProps> = ({ formData,
 
         setSuccess(true);
       })
-      .catch((err) => {
+      .catch((err: string) => {
         setError("Payment could not be processed. Please try again.");
+        setSuccess(false);
+        setLoading(false);
+        console.error(err);
       })
       .finally(() => {
         setLoading(false);
@@ -74,15 +91,14 @@ const PayPalButtonComponent: React.FC<PayPalButtonComponentProps> = ({ formData,
   };
 
   return (
-    <PayPalScriptProvider options={{ "client-id": "your-client-id" }}>
+    <PayPalScriptProvider
+      options={{ clientId: import.meta.env.VITE_SANDBOX_CLIENT_ID }}
+    >
       <div>
         {loading && <div>Loading...</div>}
         {error && <div>{error}</div>}
         {success && <div>Payment successful!</div>}
-        <PayPalButtons
-          createOrder={onCreateOrder}
-          onApprove={onApproveOrder}
-        />
+        <PayPalButtons createOrder={onCreateOrder} onApprove={onApproveOrder} />
       </div>
     </PayPalScriptProvider>
   );

@@ -21,6 +21,8 @@ interface Product {
   subCategory: string;
   sizeOptions: string[];
   isReturnable: boolean;
+  isVisible: boolean;
+  onSale: boolean;
   bashProductUUID: string;
   productCode: string;
   soldBy: string;
@@ -58,6 +60,8 @@ const AdminPage = () => {
     subCategory: "",
     sizeOptions: [],
     isReturnable: false,
+    isVisible: true,
+    onSale: false,
     bashProductUUID: generateUUID(),
     productCode: generateProductCode(),
     soldBy: "",
@@ -71,7 +75,9 @@ const AdminPage = () => {
   }, [dispatch]);
 
   const handleInputChange = (
-    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>,
+    e: React.ChangeEvent<
+      HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement
+    >,
     fieldName: string
   ) => {
     const { value } = e.target;
@@ -138,6 +144,8 @@ const AdminPage = () => {
       subCategory: "",
       sizeOptions: [],
       isReturnable: false,
+      isVisible: true,
+      onSale: false,
       bashProductUUID: generateUUID(),
       productCode: generateProductCode(),
       soldBy: "",
@@ -358,6 +366,42 @@ const AdminPage = () => {
               />
               <label className="form-check-label" htmlFor="isReturnable">
                 Is Returnable?
+              </label>
+            </div>
+
+            <div className="mb-3 form-check">
+              <input
+                type="checkbox"
+                className="form-check-input"
+                id="isVisible"
+                checked={newProduct.isVisible}
+                onChange={() =>
+                  setNewProduct({
+                    ...newProduct,
+                    isVisible: !newProduct.isVisible,
+                  })
+                }
+              />
+              <label className="form-check-label" htmlFor="isVisible">
+                Is Visible?
+              </label>
+            </div>
+
+            <div className="mb-3 form-check">
+              <input
+                type="checkbox"
+                className="form-check-input"
+                id="onSale"
+                checked={newProduct.onSale}
+                onChange={() =>
+                  setNewProduct({
+                    ...newProduct,
+                    onSale: !newProduct.onSale,
+                  })
+                }
+              />
+              <label className="form-check-label" htmlFor="onSale">
+                On Sale?
               </label>
             </div>
 

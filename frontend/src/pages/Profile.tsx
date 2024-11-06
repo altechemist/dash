@@ -21,8 +21,9 @@ function Profile() {
   
   // Filter products in the user's wishlist
   const favoriteProducts = products.filter((product) =>
-    user?.wishlist.includes(product.id)
+    user?.wishlist.includes(String(product.id))
   );
+  ;
 
   // Fetch orders when user is logged in
   useEffect(() => {
@@ -145,26 +146,33 @@ function Profile() {
 
           {activeTab === "wishlist" && favoriteProducts.length > 0 && (
             <div>
-              <h4>My Wishlist</h4>
-              <div className="d-flex flex-wrap">
-                { favoriteProducts.map((product) => (
-                  <div key={product.id} className="card m-2" style={{ width: "18rem" }}>
-                    <img src={product.images[0]} className="card-img-top" alt={product.name} />
-                    <div className="card-body">
-                      <h5 className="card-title">{product.name}</h5>
-                      <p className="card-text">{product.description}</p>
-                      <p className="card-text"><strong>${product.price}</strong></p>
-                      <button
-                        className="btn btn-danger"
-                        onClick={() => dispatch(removeFromWishlist(user.uid, product.id))}
-                      >
-                        Remove from Wishlist
-                      </button>
-                    </div>
+            <h4>My Wishlist</h4>
+            <div className="d-flex flex-wrap">
+              {favoriteProducts.map((product) => (
+                <div key={product.id} className="card m-2" style={{ width: "18rem" }}>
+                  <img
+                    src={product.images?.[0]}
+                    className="card-img-top"
+                    alt={product.name}
+                  />
+                  <div className="card-body">
+                    <h5 className="card-title">{product.name}</h5>
+                    <p className="card-text">{product.description}</p>
+                    <p className="card-text">
+                      <strong>${product.price}</strong>
+                    </p>
+                    <button
+                      className="btn btn-danger"
+                      onClick={() => dispatch(removeFromWishlist(user.uid, String(product.id)))}
+                    >
+                      Remove from Wishlist
+                    </button>
                   </div>
-                ))}
-              </div>
+                </div>
+              ))}
             </div>
+          </div>
+          
           )}
 
           {/* 'My Orders' Tab */}

@@ -43,10 +43,18 @@ const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
 
   // Handle Add to Cart for both guest and logged-in users
   const handleAddToCart = (productId: string | undefined) => {
-
     // productId: string, productName: string, productPrice: number, productImage: string, quantity: number, userId?: string
     if (user && productId && product.images) {
-      dispatch(addToCart(productId, product.name, product.price, product.images[0], 1, user.uid));
+      dispatch(
+        addToCart(
+          productId,
+          product.name,
+          product.price,
+          product.images[0],
+          1,
+          user.uid
+        )
+      );
     } else {
       // Handle guest users - store cart in localStorage
       const localCart = JSON.parse(
@@ -54,25 +62,41 @@ const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
       );
 
       const existingItemIndex = localCart.items.findIndex(
-        (item: { productId: string, productName: string, productPrice: number, productImage: string, quantity: number }) => item.productId === productId
+        (item: {
+          productId: string;
+          productName: string;
+          productPrice: number;
+          productImage: string;
+          quantity: number;
+        }) => item.productId === productId
       );
 
       if (existingItemIndex > -1) {
         localCart.items[existingItemIndex].quantity += 1;
       } else {
         localCart.items.push({
-            productId,
-            productName: product.name,
-            productPrice: product.price,
-            productImage: product.images[0],
-            quantity: 1
-          });
+          productId,
+          productName: product.name,
+          productPrice: product.price,
+          productImage: product.images?.[0] || placeholder_image,
+          quantity: 1,
+        });
       }
 
       // Save the updated cart to localStorage
       localStorage.setItem("guestCart", JSON.stringify(localCart));
 
-      if (productId && product.images) dispatch(addToCart(productId, product.name, product.price, product.images[0], 1, "guest"));
+      if (productId && product.images)
+        dispatch(
+          addToCart(
+            productId,
+            product.name,
+            product.price,
+            product.images[0],
+            1,
+            "guest"
+          )
+        );
     }
   };
 

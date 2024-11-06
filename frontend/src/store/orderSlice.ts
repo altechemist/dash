@@ -31,7 +31,7 @@ interface Order {
   id?: string;
   userId: string;
   items: OrderItem[];
-  status: "Pending" | "Canceled" | "Completed";
+  status: string;
   billingInfo: BillingInfo;
   createdAt: Date;
   updatedAt: Date;

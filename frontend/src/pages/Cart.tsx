@@ -6,7 +6,7 @@ import {
   removeFromCart,
   setCart,
   calculateSubtotal,
-  updateCartItemQuantity,
+  updateCartItemQuantity, setSubtotal
 } from "../store/cartSlice";
 import productImage from "../assets/logo.png";
 
@@ -55,14 +55,17 @@ const Cart = () => {
   };
 
   // Calculate subtotal dynamically
-  let subtotal: number | undefined;
+  let subtotal: number | undefined | string;
   if (cart) subtotal = calculateSubtotal(cart);
+  dispatch(setSubtotal());
+
 
   // Handle quantity change
   const handleQuantityChange = (newQuantity: number, productId: string) => {
     if (newQuantity < 1) return;
     if (user?.uid) {
       dispatch(updateCartItemQuantity(user.uid, productId, newQuantity));
+      dispatch(setSubtotal());
     } else {
       // Handle guest cart (localStorage)
       const localCart: Cart = JSON.parse(
@@ -175,7 +178,7 @@ const Cart = () => {
         {/* Subtotals */}
         <div className="d-flex justify-content-between">
           <p>Subtotal:</p>
-          <p>R{subtotal && subtotal.toFixed(2)}</p>
+          <p>R{Number(subtotal) && Number(subtotal).toFixed(2)}</p>
         </div>
 
         {/* Checkout Button */}

@@ -25,17 +25,19 @@ export interface CartState {
   cart: Cart | null;
   loading: boolean;
   error: string | null;
+  subtotal: number;
 }
 
 const initialState: CartState = {
   cart: null,
   loading: false,
   error: null,
+  subtotal: 0,
 };
 
 // Create the cart slice
 const cartSlice = createSlice({
-  name: "cart",
+  name: 'cart',
   initialState,
   reducers: {
     setLoading(state) {
@@ -45,10 +47,22 @@ const cartSlice = createSlice({
     setCart(state, action: PayloadAction<Cart | null>) {
       state.cart = action.payload;
       state.loading = false;
+      state.error = null;
     },
     setError(state, action: PayloadAction<string | null>) {
       state.error = action.payload;
       state.loading = false;
+    },
+    setSubtotal(state) {
+      // Ensure cart and items are available before calculating
+      if (state.cart && state.cart.items) {
+        state.subtotal = state.cart.items.reduce((total: number, item: { productPrice: number; quantity: number }) => {
+          return total + item.productPrice * item.quantity;
+        }, 0);
+      } else {
+        state.subtotal = 0;
+      }
+      state.error = null;
     },
   },
 });
@@ -265,11 +279,12 @@ export const syncCartWithFirestore = async (userId: string, dispatch: AppDispatc
   }
 };
 
-export const { setLoading, setCart, setError } = cartSlice.actions;
+export const { setLoading, setCart, setError, setSubtotal } = cartSlice.actions;
 
 // Subtotal calculation based on the current state
 export const calculateSubtotal = (cart: Cart) => {
-  return cart.items.reduce((total, item) => total + item.productPrice * item.quantity, 0);
+  const sub = cart.items.reduce((total, item) => total + item.productPrice * item.quantity, 0);
+  return sub.toFixed(2);
 };
 
 export default cartSlice.reducer;
