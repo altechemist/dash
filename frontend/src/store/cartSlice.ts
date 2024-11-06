@@ -9,19 +9,22 @@ import { AppDispatch } from "./store";
 
 // Define interfaces for Cart and CartItem
 interface CartItem {
-  productId: string; // Product identifier
-  quantity: number;  // Quantity of the product
+  productId: string;
+  productName: string;
+  productPrice: number;
+  productImage: string;
+  quantity: number;
 }
 
 interface Cart {
-  userId: string;    // User identifier
-  items: CartItem[]; // Array of cart items
+  userId?: string;
+  items: CartItem[];
 }
 
 export interface CartState {
-  cart: Cart | null; // Current cart state
-  loading: boolean;   // Loading state
-  error: string | null; // Error message
+  cart: Cart | null;
+  loading: boolean;
+  error: string | null;
 }
 
 const initialState: CartState = {
@@ -71,32 +74,82 @@ export const fetchCart = (userId: string) => async (dispatch: AppDispatch) => {
   }
 };
 
-// Add an item to the cart
-export const addToCart = (userId: string, productId: string, quantity: number) => async (dispatch: AppDispatch) => {
+// Adds to cart
+export const addToCart = (
+  productId: string, 
+  productName: string, 
+  productPrice: number, 
+  productImage: string, 
+  quantity: number, 
+  userId?: string
+) => async (dispatch: AppDispatch) => {
   dispatch(cartSlice.actions.setLoading());
+
   try {
-    const docRef = doc(db, "carts", userId);
-    const docSnap = await getDoc(docRef);
-    
-    if (docSnap.exists()) {
-      const cart = docSnap.data() as Cart;
-      const existingItemIndex = cart.items.findIndex(item => item.productId === productId);
+    if (!userId) {
+      // Handle guest users - cart stored locally
+      const localCart: Cart = JSON.parse(localStorage.getItem('guestCart') || '{"items": []}');
+
+      // Check if the item already exists in the cart
+      const existingItemIndex = localCart.items.findIndex((item: CartItem) => item.productId === productId);
       
       if (existingItemIndex > -1) {
         // Update quantity if item exists
-        cart.items[existingItemIndex].quantity += quantity;
+        localCart.items[existingItemIndex].quantity += quantity;
       } else {
-        // Add new item
-        cart.items.push({ productId, quantity });
+        // Add new item for guest, including all details
+        localCart.items.push({ 
+          productId, 
+          productName, 
+          productPrice, 
+          productImage, 
+          quantity 
+        });
       }
-      
-      await setDoc(docRef, cart);
-      dispatch(cartSlice.actions.setCart(cart));
+
+      // Save updated cart to localStorage with all item details
+      localStorage.setItem('guestCart', JSON.stringify(localCart));
+
+      // Update the Redux store with the local cart
+      dispatch(cartSlice.actions.setCart(localCart));
+
     } else {
-      // Create a new cart if it doesn't exist
-      const newCart: Cart = { userId, items: [{ productId, quantity }] };
-      await setDoc(docRef, newCart);
-      dispatch(cartSlice.actions.setCart(newCart));
+      // Handle authenticated users - cart stored in Firestore
+      const docRef = doc(db, "carts", userId);
+      const docSnap = await getDoc(docRef);
+    
+      if (docSnap.exists()) {
+        const cart = docSnap.data() as Cart;
+        const existingItemIndex = cart.items.findIndex((item: CartItem) => item.productId === productId);
+        
+        if (existingItemIndex > -1) {
+          // Update quantity if item exists
+          cart.items[existingItemIndex].quantity += quantity;
+        } else {
+          // Add new item to Firestore cart, including all details
+          cart.items.push({ 
+            productId, 
+            productName, 
+            productPrice, 
+            productImage, 
+            quantity 
+          });
+        }
+        
+        await setDoc(docRef, cart);
+        dispatch(cartSlice.actions.setCart(cart));
+      } else {
+        // Create a new cart if it doesn't exist in Firestore
+        const newCart: Cart = { userId, items: [{ 
+          productId, 
+          productName, 
+          productPrice, 
+          productImage, 
+          quantity,
+        }] };
+        await setDoc(docRef, newCart);
+        dispatch(cartSlice.actions.setCart(newCart));
+      }
     }
   } catch (error) {
     dispatch(cartSlice.actions.setError((error as Error).message));
@@ -104,51 +157,119 @@ export const addToCart = (userId: string, productId: string, quantity: number) =
 };
 
 // Remove an item from the cart
-export const removeFromCart = (userId: string, productId: string) => async (dispatch: AppDispatch) => {
+export const removeFromCart = (userId: string | undefined, productId: string) => async (dispatch: AppDispatch) => {
   dispatch(cartSlice.actions.setLoading());
+
   try {
-    const docRef = doc(db, "carts", userId);
-    const docSnap = await getDoc(docRef);
-    
-    if (docSnap.exists()) {
-      const cart = docSnap.data() as Cart;
-      cart.items = cart.items.filter(item => item.productId !== productId);
-      await setDoc(docRef, cart);
-      dispatch(cartSlice.actions.setCart(cart));
+    if (userId) {
+      // Handle authenticated users - cart stored in Firestore
+      const docRef = doc(db, "carts", userId);
+      const docSnap = await getDoc(docRef);
+
+      if (docSnap.exists()) {
+        const cart = docSnap.data() as Cart;
+        cart.items = cart.items.filter(item => item.productId !== productId);
+
+        // Save updated cart in Firestore
+        await setDoc(docRef, cart);
+        dispatch(cartSlice.actions.setCart(cart));
+      } else {
+        dispatch(cartSlice.actions.setError("Cart not found."));
+      }
     } else {
-      dispatch(cartSlice.actions.setError("Cart not found."));
+      // Handle guest users
+      const localCart: Cart = JSON.parse(localStorage.getItem("guestCart") || '{"items": []}');
+      localCart.items = localCart.items.filter(item => item.productId !== productId);
+      console.log(localCart)
+
+      // Save updated cart to localStorage
+      localStorage.setItem("guestCart", JSON.stringify(localCart));
+      dispatch(cartSlice.actions.setCart(localCart));
     }
   } catch (error) {
     dispatch(cartSlice.actions.setError((error as Error).message));
   }
 };
 
+
 // Update the quantity of a cart item
-export const updateCartItemQuantity = (userId: string, productId: string, quantity: number) => async (dispatch: AppDispatch) => {
+export const updateCartItemQuantity = (userId: string | undefined, productId: string, quantity: number) => async (dispatch: AppDispatch) => {
   dispatch(cartSlice.actions.setLoading());
+
   try {
-    const docRef = doc(db, "carts", userId);
-    const docSnap = await getDoc(docRef);
-    
-    if (docSnap.exists()) {
-      const cart = docSnap.data() as Cart;
-      const existingItemIndex = cart.items.findIndex(item => item.productId === productId);
-      
+    if (userId) {
+      // Handle authenticated users - cart stored in Firestore
+      const docRef = doc(db, "carts", userId);
+      const docSnap = await getDoc(docRef);
+
+      if (docSnap.exists()) {
+        const cart = docSnap.data() as Cart;
+        const existingItemIndex = cart.items.findIndex(item => item.productId === productId);
+
+        if (existingItemIndex > -1) {
+          cart.items[existingItemIndex].quantity = quantity;
+          await setDoc(docRef, cart);
+          dispatch(cartSlice.actions.setCart(cart));
+        } else {
+          dispatch(cartSlice.actions.setError("Product not found in cart."));
+        }
+      } else {
+        dispatch(cartSlice.actions.setError("Cart not found."));
+      }
+    } else {
+      // Handle guest users - cart stored in localStorage
+      const localCart: Cart = JSON.parse(localStorage.getItem("guestCart") || '{"items": []}');
+      const existingItemIndex = localCart.items.findIndex(item => item.productId === productId);
+
       if (existingItemIndex > -1) {
-        cart.items[existingItemIndex].quantity = quantity; // Update quantity
-        await setDoc(docRef, cart);
-        dispatch(cartSlice.actions.setCart(cart));
+        localCart.items[existingItemIndex].quantity = quantity;
+        localStorage.setItem("guestCart", JSON.stringify(localCart));
+        dispatch(cartSlice.actions.setCart(localCart));
       } else {
         dispatch(cartSlice.actions.setError("Product not found in cart."));
       }
-    } else {
-      dispatch(cartSlice.actions.setError("Cart not found."));
     }
   } catch (error) {
     dispatch(cartSlice.actions.setError((error as Error).message));
+  }
+};
+
+
+// Sync local data with firebase
+export const syncCartWithFirestore = async (userId: string, dispatch: AppDispatch) => {
+  const localCart: Cart = JSON.parse(localStorage.getItem('guestCart') || '{"items": []}');
+
+  if (localCart.items.length > 0) {
+    const docRef = doc(db, "carts", userId);
+    const docSnap = await getDoc(docRef);
+
+    const firestoreCart = docSnap.exists() ? docSnap.data() as Cart : { userId, items: [] };
+
+    localCart.items.forEach((localItem: CartItem) => { 
+      const existingItemIndex = firestoreCart.items.findIndex(item => item.productId === localItem.productId);
+      if (existingItemIndex > -1) {
+        firestoreCart.items[existingItemIndex].quantity += localItem.quantity;
+      } else {
+        firestoreCart.items.push(localItem);
+      }
+    });
+
+    // Save the merged cart to Firestore
+    await setDoc(docRef, firestoreCart);
+
+    // Remove local cart from localStorage
+    localStorage.removeItem('guestCart');
+
+    // Dispatch the updated cart to Redux store
+    dispatch(cartSlice.actions.setCart(firestoreCart));
   }
 };
 
 export const { setLoading, setCart, setError } = cartSlice.actions;
+
+// Subtotal calculation based on the current state
+export const calculateSubtotal = (cart: Cart) => {
+  return cart.items.reduce((total, item) => total + item.productPrice * item.quantity, 0);
+};
 
 export default cartSlice.reducer;

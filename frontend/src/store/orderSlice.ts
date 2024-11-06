@@ -10,17 +10,31 @@ import {
 import { db } from '../../config/firebase';
 import { AppDispatch } from "./store";
 
-// Define an order interface
+interface OrderItem {
+  productId: string;
+  quantity: number;
+}
+
+interface BillingInfo {
+  firstName: string;
+  lastName: string;
+  username: string;
+  email?: string;
+  address: string;
+  address2?: string;
+  country: string;
+  state: string;
+  zip: string;
+}
+
 interface Order {
-  id?: string;            // Unique identifier for the order
-  userId: string;        // User ID who placed the order
-  items: Array<{
-    productId: string;    // ID of the product
-    quantity: number;     // Quantity of the product
-  }>;                     // Array of items in the order
-  status: "Pending" | "Canceled" | "Completed"; // Status of the order
-  createdAt: Date;       // Timestamp when the order was created
-  updatedAt: Date;       // Timestamp when the order was last updated
+  id?: string;
+  userId: string;
+  items: OrderItem[];
+  status: "Pending" | "Canceled" | "Completed";
+  billingInfo: BillingInfo;
+  createdAt: Date;
+  updatedAt: Date;
 }
 
 interface OrderState {
@@ -84,7 +98,6 @@ export const fetchAllOrders = () => async (dispatch: AppDispatch) => {
   }
 };
 
-// Create a new order
 // Create a new order
 export const createOrder = (order: Omit<Order, "id" | "createdAt" | "updatedAt">) => async (dispatch: AppDispatch) => {
     dispatch(orderSlice.actions.setLoading());

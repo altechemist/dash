@@ -12,20 +12,22 @@ import { AppDispatch } from "./store";
 
 // Define a product interface
 interface Product {
-  id?: string; // Unique identifier for the product
-  name: string; // Name of the product
-  brand: string; // Brand of the product
-  price: number; // Price of the product
-  description: string; // Description of the product
-  sku: string; // Stock Keeping Unit
-  category: string; // Category of the product
-  subCategory: string; // Sub-category of the product
-  sizeOptions: string[]; // Array of available size options
-  isReturnable: boolean; // Is the product returnable?
-  bashProductUUID: string; // UUID for the product
-  productCode: string; // Product code
-  soldBy: string; // Seller information
-  images?: string[]; // Array of image URLs for the product
+  id?: string;
+  name: string;
+  brand: string;
+  price: number;
+  description: string;
+  sku: string;
+  category: string;
+  subCategory: string;
+  sizeOptions: string[];
+  isReturnable: boolean;
+  isVisible: boolean;
+  onSale: boolean;
+  bashProductUUID: string;
+  productCode: string;
+  soldBy: string;
+  images?: string[];
 }
 
 interface ProductState {
@@ -98,6 +100,13 @@ export const fetchAllProducts = () => async (dispatch: AppDispatch) => {
 // Add a product
 export const addProduct = (product: Product) => async (dispatch: AppDispatch) => {
   dispatch(productSlice.actions.setLoading());
+
+  // Validate product info
+  if (!product.name ||!product.brand ||!product.price ||!product.description ||!product.sku ||!product.category ||!product.subCategory ||!product.sizeOptions ||!product.isReturnable ||!product.bashProductUUID ||!product.productCode ||!product.soldBy) {
+    dispatch(productSlice.actions.setError("Product information is missing or invalid."));
+    return;
+  }
+
   try {
     const docRef = await addDoc(collection(db, "products"), product);
     const newProduct: Product = { ...product, id: docRef.id };

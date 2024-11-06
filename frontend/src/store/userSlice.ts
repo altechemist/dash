@@ -9,7 +9,7 @@ import {
   GoogleAuthProvider,
   signOut,
 } from "firebase/auth";
-import { auth, db } from '../../config/firebase';
+import { auth, db } from "../../config/firebase";
 import { AppDispatch } from "./store";
 import {
   doc,
@@ -22,13 +22,15 @@ import {
 
 // Define a custom user interface
 interface CustomUser {
-  uid: string;                   // Unique identifier for the user
-  username: string | null;       // Username of the user
-  email: string | null;          // Email address of the user
-  addresses: string[];           // Array of addresses associated with the user
-  createdAt: Date;               // Timestamp when the user was created
-  updatedAt: Date;               // Timestamp when the user was last updated
-  wishlist: string[];            // Array of items in the user's wishlist
+  uid: string;
+  role: string;
+  username: string | null;
+  email: string | null;
+  addresses: string[];
+  createdAt: Date;
+  updatedAt: Date;
+  wishlist: string[];
+  orders: string[];
 }
 
 export interface AuthState {
@@ -81,12 +83,14 @@ const createUserProfile = async (user: CustomUser) => {
   try {
     await setDoc(doc(db, "Users", user.uid), {
       uid: user.uid,
+      role: "client",
       username: user.username,
       email: user.email,
       addresses: [],
       createdAt: new Date(),
       updatedAt: new Date(),
       wishlist: [],
+      orders: [],
     });
   } catch (error) {
     console.error("Error creating user profile:", error);
@@ -99,21 +103,51 @@ export const register =
   async (dispatch: AppDispatch) => {
     dispatch(setLoading());
     try {
-      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+      const userCredential = await createUserWithEmailAndPassword(
+        auth,
+        email,
+        password
+      );
       const user = userCredential.user;
+      console.log(user);
 
       const customUser: CustomUser = {
         uid: user.uid,
+        role: "client",
         username: username,
         email: user.email,
         addresses: [],
         createdAt: new Date(),
         updatedAt: new Date(),
         wishlist: [],
+        orders: [],
       };
 
       await createUserProfile(customUser);
       dispatch(setUser(customUser));
+    } catch (error) {
+      handleAuthError(error as Error, dispatch);
+    }
+  };
+
+// Update user profile
+export const updateProfile =
+  (
+    userId: string,
+    updatedData: { username?: string; email?: string; addresses?: string[] }
+  ) =>
+  async (dispatch: AppDispatch) => {
+    if (!userId || !updatedData) return;
+    try {
+      const userRef = doc(db, "Users", userId);
+      await updateDoc(userRef, updatedData);
+
+      // Get the updated user data
+      const userDoc = await getDoc(userRef);
+      if (userDoc.exists()) {
+        const updatedUserData = userDoc.data() as CustomUser;
+        dispatch(setUser(updatedUserData));
+      }
     } catch (error) {
       handleAuthError(error as Error, dispatch);
     }
@@ -124,7 +158,11 @@ export const login =
   (email: string, password: string) => async (dispatch: AppDispatch) => {
     dispatch(setLoading());
     try {
-      const userCredential = await signInWithEmailAndPassword(auth, email, password);
+      const userCredential = await signInWithEmailAndPassword(
+        auth,
+        email,
+        password
+      );
       const user = userCredential.user;
 
       const userDoc = await getDoc(doc(db, "Users", user.uid));
@@ -141,18 +179,19 @@ export const login =
 
 // Social login actions
 export const socialLogin =
-  (provider: 'google' | 'facebook' | 'twitter') => async (dispatch: AppDispatch) => {
+  (provider: "google" | "facebook" | "twitter") =>
+  async (dispatch: AppDispatch) => {
     dispatch(setLoading());
     let authProvider;
 
     switch (provider) {
-      case 'google':
+      case "google":
         authProvider = new GoogleAuthProvider();
         break;
-      case 'facebook':
+      case "facebook":
         authProvider = new FacebookAuthProvider();
         break;
-      case 'twitter':
+      case "twitter":
         authProvider = new TwitterAuthProvider();
         break;
       default:
@@ -165,12 +204,14 @@ export const socialLogin =
 
       const customUser: CustomUser = {
         uid: user.uid,
-        username: user.email?.split('@')[0] || null,
+        role: "client",
+        username: user.email?.split("@")[0] || null,
         email: user.email,
         addresses: [],
         createdAt: new Date(),
         updatedAt: new Date(),
         wishlist: [],
+        orders: [],
       };
 
       await createUserProfile(customUser);

@@ -1,19 +1,19 @@
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { useEffect, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
-import { RootState } from "../store/store"; // Adjust import based on your store setup
-// Import your registration action here
-// import { registerUser } from '../store/userSlice'; // Example import
+import { AppDispatch, RootState } from "../store/store";
+import { register } from "../store/userSlice";
+import logo from "../assets/logo.png";
 
 export default function Register() {
   // Get form data
-  const [fullName, setFullName] = useState<string>("");
+  const [username, setUsername] = useState<string>("");
   const [email, setEmail] = useState<string>("");
   const [password, setPassword] = useState<string>("");
   const [confirmPassword, setConfirmPassword] = useState<string>("");
   const [loading, setLoading] = useState<boolean>(false);
-  
-  const dispatch = useDispatch();
+
+  const dispatch = useDispatch<AppDispatch>();
   const navigate = useNavigate();
 
   // Access user and error from Redux store
@@ -25,16 +25,14 @@ export default function Register() {
     e.preventDefault();
     setLoading(true);
 
-    // Example of dispatching a registration action
-    // await dispatch(registerUser({ fullName, email, password }));
-    
+    dispatch(register(email, password, username));
     setLoading(false);
   };
 
   // Redirect user if logged in
   useEffect(() => {
     if (user) {
-      navigate("/"); // Redirect to homepage or any other page
+      navigate("/");
     }
   }, [user, navigate]);
 
@@ -43,14 +41,15 @@ export default function Register() {
       <main className="form-signin w-100 m-auto">
         <form onSubmit={handleSubmit}>
           <img
-            className="mb-4"
-            src="/docs/5.3/assets/brand/bootstrap-logo.svg"
-            alt="Bootstrap logo"
-            width="72"
-            height="57"
+            className="img-fluid"
+            src={logo}
+            alt="dash logo"
+            width="100"
+            height="100"
           />
           <h1 className="h3 mb-3 fw-normal">Please sign up</h1>
-
+           {/* Display error message */}
+           {error && <p className="alert alert-danger">{error}</p>}{" "}
           <div className="form-floating">
             <input
               type="text"
@@ -58,8 +57,8 @@ export default function Register() {
               id="floatingName"
               placeholder="John Smith"
               required
-              value={fullName}
-              onChange={(e) => setFullName(e.target.value)} // Bind full name state
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
             />
             <label htmlFor="floatingName">Full Names</label>
           </div>
@@ -72,7 +71,7 @@ export default function Register() {
               placeholder="name@example.com"
               required
               value={email}
-              onChange={(e) => setEmail(e.target.value)} // Bind email state
+              onChange={(e) => setEmail(e.target.value)}
             />
             <label htmlFor="floatingEmail">Email address</label>
           </div>
@@ -85,7 +84,7 @@ export default function Register() {
               placeholder="Password"
               required
               value={password}
-              onChange={(e) => setPassword(e.target.value)} // Bind password state
+              onChange={(e) => setPassword(e.target.value)}
             />
             <label htmlFor="floatingPassword">Password</label>
           </div>
@@ -98,25 +97,24 @@ export default function Register() {
               placeholder="Confirm Password"
               required
               value={confirmPassword}
-              onChange={(e) => setConfirmPassword(e.target.value)} // Bind confirm password state
+              onChange={(e) => setConfirmPassword(e.target.value)}
             />
             <label htmlFor="floatingConfirmPassword">Confirm Password</label>
           </div>
-
-          <div className="form-check text-start my-3">
-            <input
-              className="form-check-input"
-              type="checkbox"
-              id="flexCheckDefault"
-            />
-            <label className="form-check-label" htmlFor="flexCheckDefault">
-              Remember me
-            </label>
+          <div className="my-3">
+          <Link className="nav-link" to="/login">
+              <small className="text-body-secondary">
+                Already have an account? Click here to login
+              </small>
+            </Link>
           </div>
-          <button className="btn btn-primary w-100 py-2" type="submit" disabled={loading}>
-            {loading ? 'Signing up...' : 'Sign up'}
+          <button
+            className="btn btn-primary w-100 py-2"
+            type="submit"
+            disabled={loading}
+          >
+            {loading ? "Signing up..." : "Sign up"}
           </button>
-          {error && <p className="text-danger">{error}</p>} {/* Display error message */}
           <p className="mt-5 mb-3 text-body-secondary">© 2017–2024</p>
         </form>
       </main>

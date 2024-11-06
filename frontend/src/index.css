@@ -1,9 +1,57 @@
 .button-group {
-  overflow-x: scroll;
-  scrollbar-width: thin;
-  scrollbar-color: #000 #f7f7f7;
+  overflow-x: scroll !important;
+  scrollbar-width: thin !important;
+  scrollbar-color: #000 #f7f7f7 !important;
+}
+
+.button-group::-webkit-scrollbar {
+  display: none;
 }
 
 .h-120 {
   height: 20rem !important;
+}
+
+:root {
+  --button-height: 2.2rem !important;
+  --button-color-default: gray !important;
+  --button-color-active: black !important;
+  --button-text-color-default: #333333 !important;
+  --button-text-color-active: #f7f7f7 !important;
+  --button-font-weight: normal !important;
+  --button-font-weight-active: bold !important;
+}
+
+.btn-primary {
+  cursor: pointer !important;
+  height: var(--button-height) !important;
+  font-weight: var(--button-font-weight) !important;
+  color: white !important;
+  background-color: black !important;
+  border: none !important;
+  border-radius: 5px !important;
+}
+
+.btn.active {
+  background-color: var(--button-color-active) !important;
+  color: var(--button-text-color-active) !important;
+  font-weight: var(--button-font-weight-active) !important;
+}
+
+.card {
+  border-color: var(--gray) !important;
+  margin-bottom: 5px !important;
+  height: 30rem !important;
+  transition: all 0.2s ease-in-out;
+}
+
+.card:hover {
+  transform: scale(1.03);
+  border: 0.3rem solid #fff;
+}
+
+.card img {
+  width: 100% !important;
+  height: 20rem !important;
+  object-fit: cover;
 }
