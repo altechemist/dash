@@ -133,6 +133,23 @@ const AdminPage = () => {
   };
 
   const handlecreateProduct = () => {
+    // Validate form
+    if (
+     !newProduct.name ||
+     !newProduct.brand ||
+     !newProduct.price ||
+     !newProduct.sku ||
+     !newProduct.category ||
+     !newProduct.subCategory ||
+     !newProduct.sizeOptions ||
+     !newProduct.bashProductUUID ||
+     !newProduct.productCode ||
+     !newProduct.soldBy ||
+     newProduct.images?.length === 0
+    ) {
+      alert("Please fill in all required fields");
+      return;
+    }
     dispatch(createProduct(newProduct));
     setNewProduct({
       name: "",
@@ -181,7 +198,7 @@ const AdminPage = () => {
     "Black Friday",
   ];
 
-  const sizeOptions = ["Small", "Medium", "Large", "Extra Large"];
+  const sizeOptions = ["Small", "Medium", "Large", "Extra Large", "UK 6", "UK 7", "UK 8", "UK 9", "UK 10", "UK 11", "UK 12"];
 
   if (loading) {
     return (

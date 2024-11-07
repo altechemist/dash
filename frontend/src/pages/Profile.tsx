@@ -15,7 +15,9 @@ function Profile() {
 
   // State for editing profile
   const [username, setUsername] = useState(user?.username || "");
-  const [addresses, setAddresses] = useState(user?.addresses.join(", ") || "");
+  const [addresses, setAddresses] = useState(
+    user?.addresses?.join(", ") || ""
+  );
   const [isEditing, setIsEditing] = useState(false);
 
   
@@ -90,7 +92,7 @@ function Profile() {
                 <div className="container text-center">
                   <p><strong>Username:</strong> {user.username}</p>
                   <p><strong>Email:</strong> {user.email}</p>
-                  <p><strong>Addresses:</strong> {user.addresses.join(", ")}</p>
+                  <p><strong>Addresses:</strong> {user?.addresses?.join(", ") || "No addresses available"}</p>
                   <button
                     className="btn btn-primary mt-3"
                     onClick={() => setIsEditing(true)} 

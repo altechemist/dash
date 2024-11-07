@@ -31,7 +31,7 @@ const initialState: CartState = {
 };
 
 // Get API base URL from the environment
-const API_URL = import.meta.env.VITE_API_URL || "http://localhost:3001";  // Fallback to localhost for local dev
+const API_URL =  "http://localhost:3001";  // Fallback to localhost for local dev
 
 const cartSlice = createSlice({
   name: 'cart',
@@ -75,6 +75,7 @@ export const fetchCart = (userId: string) => async (dispatch: AppDispatch) => {
   dispatch(cartSlice.actions.setLoading());
   try {
     const response = await axios.get(`${API_URL}/api/carts/${userId}`);
+    
     dispatch(cartSlice.actions.setCart(response.data.cart));
   } catch (error) {
     dispatch(cartSlice.actions.setError(error instanceof Error ? error.message : "Failed to fetch cart"));
@@ -111,7 +112,7 @@ export const addToCart = (
       }
 
       localStorage.setItem('guestCart', JSON.stringify(localCart));
-      dispatch(cartSlice.actions.setCart(localCart)); // Recalculate subtotal after adding item
+      dispatch(cartSlice.actions.setCart(localCart));
     } else {
       // Handle authenticated users - cart stored via API
       const response = await axios.post(`${API_URL}/api/carts/${userId}/add`, { 

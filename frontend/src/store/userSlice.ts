@@ -1,8 +1,26 @@
 import { createSlice, PayloadAction } from "@reduxjs/toolkit";
-import axios from "axios";
+import {
+  createUserWithEmailAndPassword,
+  signInWithEmailAndPassword,
+  sendPasswordResetEmail,
+  signInWithPopup,
+  FacebookAuthProvider,
+  TwitterAuthProvider,
+  GoogleAuthProvider,
+  signOut,
+} from "firebase/auth";
+import { auth, db } from "../../config/firebase";
 import { AppDispatch } from "./store";
+import {
+  doc,
+  getDoc,
+  setDoc,
+  updateDoc,
+  arrayUnion,
+  arrayRemove,
+} from "firebase/firestore";
 
-// Define interfaces for CustomUser and AuthState
+// Define a custom user interface
 interface CustomUser {
   uid: string;
   role: string;
@@ -15,23 +33,30 @@ interface CustomUser {
   orders: string[];
 }
 
-interface AuthState {
+export interface AuthState {
   user: CustomUser | null;
   loading: boolean;
   error: string | null;
 }
 
 const initialState: AuthState = {
-  user: JSON.parse(localStorage.getItem("user") || "null"),
+  user: null,
   loading: false,
   error: null,
 };
 
-const API_URL = import.meta.env.VITE_API_URL || "http://localhost:3001"; // Fallback to localhost for local dev
+// Load user from local storage
+const loadUserFromLocalStorage = (): CustomUser | null => {
+  const user = localStorage.getItem("user");
+  return user ? JSON.parse(user) : null;
+};
 
 const userSlice = createSlice({
   name: "user",
-  initialState,
+  initialState: {
+    ...initialState,
+    user: loadUserFromLocalStorage(),
+  },
   reducers: {
     setLoading(state) {
       state.loading = true;
@@ -50,168 +75,232 @@ const userSlice = createSlice({
       state.error = action.payload;
       state.loading = false;
     },
-    setWishlist(state, action: PayloadAction<string[]>) {
-      if (state.user) {
-        state.user.wishlist = action.payload;
-      }
-      state.loading = false;
-    },
   },
 });
 
-// Register a new user via the API
-export const register =
-  (email: string, password: string, username: string) =>
-  async (dispatch: AppDispatch) => {
-    dispatch(userSlice.actions.setLoading());
-    try {
-      const response = await axios.post(`${API_URL}/api/users/register`, {
-        email,
-        password,
-        username,
-      });
-      const customUser: CustomUser = response.data.user;
-      dispatch(userSlice.actions.setUser(customUser));
-    } catch (error) {
-      dispatch(
-        userSlice.actions.setError(
-          error instanceof Error ? error.message : "Failed to register user"
-        )
-      );
-    }
-  };
-
-// Login a user via the API
-export const login =
-  (email: string, password: string) => async (dispatch: AppDispatch) => {
-    dispatch(userSlice.actions.setLoading());
-    try {
-      const response = await axios.post(`${API_URL}/api/users/login`, {
-        email,
-        password,
-      });
-      const customUser: CustomUser = response.data.user;
-      dispatch(userSlice.actions.setUser(customUser));
-    } catch (error) {
-      dispatch(
-        userSlice.actions.setError(
-          error instanceof Error ? error.message : "Failed to login"
-        )
-      );
-    }
-  };
-
-// Logout the user via the API
-export const logout = () => async (dispatch: AppDispatch) => {
-  dispatch(userSlice.actions.setLoading());
+// Create user profile in Firestore
+const createUserProfile = async (user: CustomUser) => {
   try {
-    await axios.post(`${API_URL}/api/users/logout`); // API call to logout user
-    dispatch(userSlice.actions.setUser(null));
+    await setDoc(doc(db, "Users", user.uid), {
+      uid: user.uid,
+      role: "client",
+      username: user.username,
+      email: user.email,
+      addresses: [],
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      wishlist: [],
+      orders: [],
+    });
   } catch (error) {
-    dispatch(
-      userSlice.actions.setError(
-        error instanceof Error ? error.message : "Failed to logout"
-      )
-    );
+    console.error("Error creating user profile:", error);
   }
 };
 
-// Reset user password via the API
-export const resetPassword =
-  (email: string) => async (dispatch: AppDispatch) => {
-    dispatch(userSlice.actions.setLoading());
-    try {
-      await axios.post(`${API_URL}/api/users/reset-password`, { email }); // API call to reset password
-      alert("Password reset email sent!");
-    } catch (error) {
-      dispatch(
-        userSlice.actions.setError(
-          error instanceof Error ? error.message : "Failed to send reset email"
-        )
-      );
-    }
-  };
-
-// Get user profile from the API
-export const getUserProfile =
-  (userId: string) => async (dispatch: AppDispatch) => {
-    dispatch(userSlice.actions.setLoading());
-    try {
-      const response = await axios.get(`${API_URL}/api/users/${userId}`);
-      dispatch(userSlice.actions.setUser(response.data.user));
-    } catch (error) {
-      dispatch(
-        userSlice.actions.setError(
-          error instanceof Error
-            ? error.message
-            : "Failed to fetch user profile"
-        )
-      );
-    }
-  };
-
-// Update user profile via the API
-export const updateProfile =
-  (userId: string, updatedData: Partial<CustomUser>) =>
+// Register action
+export const register =
+  (email: string, password: string, username: string) =>
   async (dispatch: AppDispatch) => {
-    dispatch(userSlice.actions.setLoading());
+    dispatch(setLoading());
     try {
-      const response = await axios.put(
-        `${API_URL}/api/users/${userId}`,
-        updatedData
+      const userCredential = await createUserWithEmailAndPassword(
+        auth,
+        email,
+        password
       );
-      dispatch(userSlice.actions.setUser(response.data.user));
+      const user = userCredential.user;
+      console.log(user);
+
+      const customUser: CustomUser = {
+        uid: user.uid,
+        role: "client",
+        username: username,
+        email: user.email,
+        addresses: [],
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        wishlist: [],
+        orders: [],
+      };
+
+      await createUserProfile(customUser);
+      dispatch(setUser(customUser));
     } catch (error) {
-      dispatch(
-        userSlice.actions.setError(
-          error instanceof Error
-            ? error.message
-            : "Failed to update user profile"
-        )
-      );
+      handleAuthError(error as Error, dispatch);
     }
   };
 
-// Add item to wishlist via the API
+// Update user profile
+export const updateProfile =
+  (
+    userId: string,
+    updatedData: { username?: string; email?: string; addresses?: string[] }
+  ) =>
+  async (dispatch: AppDispatch) => {
+    if (!userId || !updatedData) return;
+    try {
+      const userRef = doc(db, "Users", userId);
+      await updateDoc(userRef, updatedData);
+
+      // Get the updated user data
+      const userDoc = await getDoc(userRef);
+      if (userDoc.exists()) {
+        const updatedUserData = userDoc.data() as CustomUser;
+        dispatch(setUser(updatedUserData));
+      }
+    } catch (error) {
+      handleAuthError(error as Error, dispatch);
+    }
+  };
+
+// Login action
+export const login =
+  (email: string, password: string) => async (dispatch: AppDispatch) => {
+    dispatch(setLoading());
+    try {
+      const userCredential = await signInWithEmailAndPassword(
+        auth,
+        email,
+        password
+      );
+      const user = userCredential.user;
+
+      const userDoc = await getDoc(doc(db, "Users", user.uid));
+      if (userDoc.exists()) {
+        const userData = userDoc.data() as CustomUser;
+        dispatch(setUser({ ...userData, uid: user.uid }));
+      } else {
+        dispatch(setError("User data not found."));
+      }
+    } catch (error) {
+      handleAuthError(error as Error, dispatch);
+    }
+  };
+
+// Social login actions
+export const socialLogin =
+  (provider: "google" | "facebook" | "twitter") =>
+  async (dispatch: AppDispatch) => {
+    dispatch(setLoading());
+    let authProvider;
+
+    switch (provider) {
+      case "google":
+        authProvider = new GoogleAuthProvider();
+        break;
+      case "facebook":
+        authProvider = new FacebookAuthProvider();
+        break;
+      case "twitter":
+        authProvider = new TwitterAuthProvider();
+        break;
+      default:
+        return;
+    }
+
+    try {
+      const result = await signInWithPopup(auth, authProvider);
+      const user = result.user;
+
+      const customUser: CustomUser = {
+        uid: user.uid,
+        role: "client",
+        username: user.email?.split("@")[0] || null,
+        email: user.email,
+        addresses: [],
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        wishlist: [],
+        orders: [],
+      };
+
+      await createUserProfile(customUser);
+      dispatch(setUser(customUser));
+    } catch (error) {
+      handleAuthError(error as Error, dispatch);
+    }
+  };
+
+// Add item to wishlist
 export const addToWishlist =
   (userId: string, itemId: string) => async (dispatch: AppDispatch) => {
-    dispatch(userSlice.actions.setLoading());
+    if (!userId || !itemId) return;
     try {
-      const response = await axios.patch(
-        `${API_URL}/api/users/${userId}/wishlist/add`,
-        { itemId }
-      );
-      dispatch(userSlice.actions.setWishlist(response.data.wishlist));
+      const userRef = doc(db, "Users", userId);
+      await updateDoc(userRef, { wishlist: arrayUnion(itemId) });
+
+      const userDoc = await getDoc(userRef);
+      if (userDoc.exists()) {
+        const updatedUserData = userDoc.data() as CustomUser;
+        dispatch(setUser(updatedUserData));
+      }
     } catch (error) {
-      dispatch(
-        userSlice.actions.setError(
-          error instanceof Error ? error.message : "Failed to add to wishlist"
-        )
-      );
+      handleAuthError(error as Error, dispatch);
     }
   };
 
-// Remove item from wishlist via the API
+// Remove item from wishlist
 export const removeFromWishlist =
   (userId: string, itemId: string) => async (dispatch: AppDispatch) => {
-    dispatch(userSlice.actions.setLoading());
+    if (!userId || !itemId) return;
     try {
-      const response = await axios.patch(
-        `${API_URL}/api/users/${userId}/wishlist/remove`,
-        { itemId }
-      );
-      dispatch(userSlice.actions.setWishlist(response.data.wishlist));
+      const userRef = doc(db, "Users", userId);
+      await updateDoc(userRef, { wishlist: arrayRemove(itemId) });
+
+      const userDoc = await getDoc(userRef);
+      if (userDoc.exists()) {
+        const updatedUserData = userDoc.data() as CustomUser;
+        dispatch(setUser(updatedUserData));
+      }
     } catch (error) {
-      dispatch(
-        userSlice.actions.setError(
-          error instanceof Error
-            ? error.message
-            : "Failed to remove from wishlist"
-        )
-      );
+      handleAuthError(error as Error, dispatch);
     }
   };
 
-export const { setLoading, setUser, setError, setWishlist } = userSlice.actions;
+// Logout action
+export const logout = () => async (dispatch: AppDispatch) => {
+  dispatch(setLoading());
+  try {
+    await signOut(auth);
+    dispatch(setUser(null));
+  } catch (error) {
+    handleAuthError(error as Error, dispatch);
+  }
+};
+
+// User-Friendly Error Handler
+const handleAuthError = (error: Error, dispatch: AppDispatch) => {
+  const errorMessage = getUserFriendlyError(error.message);
+  dispatch(setError(errorMessage));
+};
+
+const getUserFriendlyError = (error: string) => {
+  switch (error) {
+    case "auth/email-already-in-use":
+      return "This email is already in use. Please try another.";
+    case "auth/invalid-email":
+      return "Please enter a valid email address.";
+    case "auth/wrong-password":
+      return "Incorrect password. Please try again.";
+    case "auth/user-not-found":
+      return "No user found with this email.";
+    default:
+      return "An unexpected error occurred. Please try again later.";
+  }
+};
+
+// Reset password
+export const resetPassword =
+  (email: string) => async (dispatch: AppDispatch) => {
+    dispatch(setLoading());
+    try {
+      await sendPasswordResetEmail(auth, email);
+      alert("Password reset email sent!");
+    } catch (error) {
+      dispatch(setError((error as Error).message));
+    }
+  };
+
+export const { setLoading, setUser, setError } = userSlice.actions;
 
 export default userSlice.reducer;

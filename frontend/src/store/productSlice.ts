@@ -85,17 +85,42 @@ export const fetchAllProducts = () => async (dispatch: AppDispatch) => {
 // Create a new product through the API
 export const createProduct = (product: Omit<Product, "id">) => async (dispatch: AppDispatch) => {
   dispatch(productSlice.actions.setLoading());
+  
   try {
-    // Validate product information to match expected data structure
+    // Validate product information to match expected data structure and types
     if (!product.name || !product.brand || !product.price || !product.sku || !product.category || !product.subCategory || !product.sizeOptions || !product.bashProductUUID || !product.productCode || !product.soldBy) {
       dispatch(productSlice.actions.setError("Product information is missing or invalid."));
       return;
     }
 
-    const response = await axios.post(`${API_URL}/api/products`, product);  // API call to create product
+    if (product.price <= 0) {
+      dispatch(productSlice.actions.setError("Price must be a positive number."));
+      return;
+    }
+
+    if (!Array.isArray(product.sizeOptions) || product.sizeOptions.length === 0) {
+      dispatch(productSlice.actions.setError("Size options must be a non-empty array."));
+      return;
+    }
+
+    // Make the API call to create the product
+    const response = await axios.post(`${API_URL}/api/products`, product);
+
+    // Assuming response.data contains a productId or similar identifier
     dispatch(productSlice.actions.addProductToState({ ...product, id: response.data.productId }));
+
   } catch (error) {
-    dispatch(productSlice.actions.setError(error instanceof Error ? error.message : "Failed to create product"));
+    // Improved error handling to catch Axios errors and show more specific messages
+    if (axios.isAxiosError(error) && error.response) {
+      const errorMessage = error.response.data?.message || "Failed to create product. Please try again.";
+      dispatch(productSlice.actions.setError(errorMessage));
+    } else if (error instanceof Error) {
+      // Handle general errors (e.g., network issues)
+      dispatch(productSlice.actions.setError(error.message));
+    } else {
+      // Fallback error message for unexpected issues
+      dispatch(productSlice.actions.setError("An unexpected error occurred while creating the product."));
+    }
   }
 };
 
@@ -109,7 +134,7 @@ export const updateProduct = (id: string, product: Partial<Product>) => async (d
       return;
     }
 
-    const response = await axios.patch(`${API_URL}/api/products/${id}`, product);  // API call to update product
+    const response = await axios.patch(`${API_URL}/api/products/${id}`, product);
     dispatch(productSlice.actions.updateProductInState(response.data.product));
   } catch (error) {
     dispatch(productSlice.actions.setError(error instanceof Error ? error.message : "Failed to update product"));
