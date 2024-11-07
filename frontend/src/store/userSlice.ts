@@ -1,26 +1,8 @@
 import { createSlice, PayloadAction } from "@reduxjs/toolkit";
-import {
-  createUserWithEmailAndPassword,
-  signInWithEmailAndPassword,
-  sendPasswordResetEmail,
-  signInWithPopup,
-  FacebookAuthProvider,
-  TwitterAuthProvider,
-  GoogleAuthProvider,
-  signOut,
-} from "firebase/auth";
-import { auth, db } from "../../config/firebase";
+import axios from "axios";
 import { AppDispatch } from "./store";
-import {
-  doc,
-  getDoc,
-  setDoc,
-  updateDoc,
-  arrayUnion,
-  arrayRemove,
-} from "firebase/firestore";
 
-// Define a custom user interface
+// Define interfaces for CustomUser and AuthState
 interface CustomUser {
   uid: string;
   role: string;
@@ -33,30 +15,23 @@ interface CustomUser {
   orders: string[];
 }
 
-export interface AuthState {
+interface AuthState {
   user: CustomUser | null;
   loading: boolean;
   error: string | null;
 }
 
 const initialState: AuthState = {
-  user: null,
+  user: JSON.parse(localStorage.getItem("user") || "null"),
   loading: false,
   error: null,
 };
 
-// Load user from local storage
-const loadUserFromLocalStorage = (): CustomUser | null => {
-  const user = localStorage.getItem("user");
-  return user ? JSON.parse(user) : null;
-};
+const API_URL = import.meta.env.VITE_API_URL || "http://localhost:3001"; // Fallback to localhost for local dev
 
 const userSlice = createSlice({
   name: "user",
-  initialState: {
-    ...initialState,
-    user: loadUserFromLocalStorage(),
-  },
+  initialState,
   reducers: {
     setLoading(state) {
       state.loading = true;
@@ -75,232 +50,168 @@ const userSlice = createSlice({
       state.error = action.payload;
       state.loading = false;
     },
+    setWishlist(state, action: PayloadAction<string[]>) {
+      if (state.user) {
+        state.user.wishlist = action.payload;
+      }
+      state.loading = false;
+    },
   },
 });
 
-// Create user profile in Firestore
-const createUserProfile = async (user: CustomUser) => {
-  try {
-    await setDoc(doc(db, "Users", user.uid), {
-      uid: user.uid,
-      role: "client",
-      username: user.username,
-      email: user.email,
-      addresses: [],
-      createdAt: new Date(),
-      updatedAt: new Date(),
-      wishlist: [],
-      orders: [],
-    });
-  } catch (error) {
-    console.error("Error creating user profile:", error);
-  }
-};
-
-// Register action
+// Register a new user via the API
 export const register =
   (email: string, password: string, username: string) =>
   async (dispatch: AppDispatch) => {
-    dispatch(setLoading());
+    dispatch(userSlice.actions.setLoading());
     try {
-      const userCredential = await createUserWithEmailAndPassword(
-        auth,
+      const response = await axios.post(`${API_URL}/api/users/register`, {
         email,
-        password
+        password,
+        username,
+      });
+      const customUser: CustomUser = response.data.user;
+      dispatch(userSlice.actions.setUser(customUser));
+    } catch (error) {
+      dispatch(
+        userSlice.actions.setError(
+          error instanceof Error ? error.message : "Failed to register user"
+        )
       );
-      const user = userCredential.user;
-      console.log(user);
-
-      const customUser: CustomUser = {
-        uid: user.uid,
-        role: "client",
-        username: username,
-        email: user.email,
-        addresses: [],
-        createdAt: new Date(),
-        updatedAt: new Date(),
-        wishlist: [],
-        orders: [],
-      };
-
-      await createUserProfile(customUser);
-      dispatch(setUser(customUser));
-    } catch (error) {
-      handleAuthError(error as Error, dispatch);
     }
   };
 
-// Update user profile
-export const updateProfile =
-  (
-    userId: string,
-    updatedData: { username?: string; email?: string; addresses?: string[] }
-  ) =>
-  async (dispatch: AppDispatch) => {
-    if (!userId || !updatedData) return;
-    try {
-      const userRef = doc(db, "Users", userId);
-      await updateDoc(userRef, updatedData);
-
-      // Get the updated user data
-      const userDoc = await getDoc(userRef);
-      if (userDoc.exists()) {
-        const updatedUserData = userDoc.data() as CustomUser;
-        dispatch(setUser(updatedUserData));
-      }
-    } catch (error) {
-      handleAuthError(error as Error, dispatch);
-    }
-  };
-
-// Login action
+// Login a user via the API
 export const login =
   (email: string, password: string) => async (dispatch: AppDispatch) => {
-    dispatch(setLoading());
+    dispatch(userSlice.actions.setLoading());
     try {
-      const userCredential = await signInWithEmailAndPassword(
-        auth,
+      const response = await axios.post(`${API_URL}/api/users/login`, {
         email,
-        password
+        password,
+      });
+      const customUser: CustomUser = response.data.user;
+      dispatch(userSlice.actions.setUser(customUser));
+    } catch (error) {
+      dispatch(
+        userSlice.actions.setError(
+          error instanceof Error ? error.message : "Failed to login"
+        )
       );
-      const user = userCredential.user;
-
-      const userDoc = await getDoc(doc(db, "Users", user.uid));
-      if (userDoc.exists()) {
-        const userData = userDoc.data() as CustomUser;
-        dispatch(setUser({ ...userData, uid: user.uid }));
-      } else {
-        dispatch(setError("User data not found."));
-      }
-    } catch (error) {
-      handleAuthError(error as Error, dispatch);
     }
   };
 
-// Social login actions
-export const socialLogin =
-  (provider: "google" | "facebook" | "twitter") =>
-  async (dispatch: AppDispatch) => {
-    dispatch(setLoading());
-    let authProvider;
-
-    switch (provider) {
-      case "google":
-        authProvider = new GoogleAuthProvider();
-        break;
-      case "facebook":
-        authProvider = new FacebookAuthProvider();
-        break;
-      case "twitter":
-        authProvider = new TwitterAuthProvider();
-        break;
-      default:
-        return;
-    }
-
-    try {
-      const result = await signInWithPopup(auth, authProvider);
-      const user = result.user;
-
-      const customUser: CustomUser = {
-        uid: user.uid,
-        role: "client",
-        username: user.email?.split("@")[0] || null,
-        email: user.email,
-        addresses: [],
-        createdAt: new Date(),
-        updatedAt: new Date(),
-        wishlist: [],
-        orders: [],
-      };
-
-      await createUserProfile(customUser);
-      dispatch(setUser(customUser));
-    } catch (error) {
-      handleAuthError(error as Error, dispatch);
-    }
-  };
-
-// Add item to wishlist
-export const addToWishlist =
-  (userId: string, itemId: string) => async (dispatch: AppDispatch) => {
-    if (!userId || !itemId) return;
-    try {
-      const userRef = doc(db, "Users", userId);
-      await updateDoc(userRef, { wishlist: arrayUnion(itemId) });
-
-      const userDoc = await getDoc(userRef);
-      if (userDoc.exists()) {
-        const updatedUserData = userDoc.data() as CustomUser;
-        dispatch(setUser(updatedUserData));
-      }
-    } catch (error) {
-      handleAuthError(error as Error, dispatch);
-    }
-  };
-
-// Remove item from wishlist
-export const removeFromWishlist =
-  (userId: string, itemId: string) => async (dispatch: AppDispatch) => {
-    if (!userId || !itemId) return;
-    try {
-      const userRef = doc(db, "Users", userId);
-      await updateDoc(userRef, { wishlist: arrayRemove(itemId) });
-
-      const userDoc = await getDoc(userRef);
-      if (userDoc.exists()) {
-        const updatedUserData = userDoc.data() as CustomUser;
-        dispatch(setUser(updatedUserData));
-      }
-    } catch (error) {
-      handleAuthError(error as Error, dispatch);
-    }
-  };
-
-// Logout action
+// Logout the user via the API
 export const logout = () => async (dispatch: AppDispatch) => {
-  dispatch(setLoading());
+  dispatch(userSlice.actions.setLoading());
   try {
-    await signOut(auth);
-    dispatch(setUser(null));
+    await axios.post(`${API_URL}/api/users/logout`); // API call to logout user
+    dispatch(userSlice.actions.setUser(null));
   } catch (error) {
-    handleAuthError(error as Error, dispatch);
+    dispatch(
+      userSlice.actions.setError(
+        error instanceof Error ? error.message : "Failed to logout"
+      )
+    );
   }
 };
 
-// User-Friendly Error Handler
-const handleAuthError = (error: Error, dispatch: AppDispatch) => {
-  const errorMessage = getUserFriendlyError(error.message);
-  dispatch(setError(errorMessage));
-};
-
-const getUserFriendlyError = (error: string) => {
-  switch (error) {
-    case "auth/email-already-in-use":
-      return "This email is already in use. Please try another.";
-    case "auth/invalid-email":
-      return "Please enter a valid email address.";
-    case "auth/wrong-password":
-      return "Incorrect password. Please try again.";
-    case "auth/user-not-found":
-      return "No user found with this email.";
-    default:
-      return "An unexpected error occurred. Please try again later.";
-  }
-};
-
-// Reset password
+// Reset user password via the API
 export const resetPassword =
   (email: string) => async (dispatch: AppDispatch) => {
-    dispatch(setLoading());
+    dispatch(userSlice.actions.setLoading());
     try {
-      await sendPasswordResetEmail(auth, email);
+      await axios.post(`${API_URL}/api/users/reset-password`, { email }); // API call to reset password
       alert("Password reset email sent!");
     } catch (error) {
-      dispatch(setError((error as Error).message));
+      dispatch(
+        userSlice.actions.setError(
+          error instanceof Error ? error.message : "Failed to send reset email"
+        )
+      );
     }
   };
 
-export const { setLoading, setUser, setError } = userSlice.actions;
+// Get user profile from the API
+export const getUserProfile =
+  (userId: string) => async (dispatch: AppDispatch) => {
+    dispatch(userSlice.actions.setLoading());
+    try {
+      const response = await axios.get(`${API_URL}/api/users/${userId}`);
+      dispatch(userSlice.actions.setUser(response.data.user));
+    } catch (error) {
+      dispatch(
+        userSlice.actions.setError(
+          error instanceof Error
+            ? error.message
+            : "Failed to fetch user profile"
+        )
+      );
+    }
+  };
+
+// Update user profile via the API
+export const updateProfile =
+  (userId: string, updatedData: Partial<CustomUser>) =>
+  async (dispatch: AppDispatch) => {
+    dispatch(userSlice.actions.setLoading());
+    try {
+      const response = await axios.put(
+        `${API_URL}/api/users/${userId}`,
+        updatedData
+      );
+      dispatch(userSlice.actions.setUser(response.data.user));
+    } catch (error) {
+      dispatch(
+        userSlice.actions.setError(
+          error instanceof Error
+            ? error.message
+            : "Failed to update user profile"
+        )
+      );
+    }
+  };
+
+// Add item to wishlist via the API
+export const addToWishlist =
+  (userId: string, itemId: string) => async (dispatch: AppDispatch) => {
+    dispatch(userSlice.actions.setLoading());
+    try {
+      const response = await axios.patch(
+        `${API_URL}/api/users/${userId}/wishlist/add`,
+        { itemId }
+      );
+      dispatch(userSlice.actions.setWishlist(response.data.wishlist));
+    } catch (error) {
+      dispatch(
+        userSlice.actions.setError(
+          error instanceof Error ? error.message : "Failed to add to wishlist"
+        )
+      );
+    }
+  };
+
+// Remove item from wishlist via the API
+export const removeFromWishlist =
+  (userId: string, itemId: string) => async (dispatch: AppDispatch) => {
+    dispatch(userSlice.actions.setLoading());
+    try {
+      const response = await axios.patch(
+        `${API_URL}/api/users/${userId}/wishlist/remove`,
+        { itemId }
+      );
+      dispatch(userSlice.actions.setWishlist(response.data.wishlist));
+    } catch (error) {
+      dispatch(
+        userSlice.actions.setError(
+          error instanceof Error
+            ? error.message
+            : "Failed to remove from wishlist"
+        )
+      );
+    }
+  };
+
+export const { setLoading, setUser, setError, setWishlist } = userSlice.actions;
 
 export default userSlice.reducer;

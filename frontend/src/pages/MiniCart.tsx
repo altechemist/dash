@@ -9,7 +9,7 @@ import {
   setSubtotal,
 } from "../store/cartSlice";
 import productImage from "../assets/logo.png";
-import { useNavigate } from "react-router-dom";
+
 
 // Types for Cart and CartItem
 interface CartItem {
@@ -25,14 +25,13 @@ interface Cart {
   subtotal?: number;
 }
 
-const Cart = () => {
+const MiniCart = () => {
   // Get cart state from Redux store
   const { cart, loading, error } = useSelector(
     (state: RootState) => state.cart
   );
   const { user } = useSelector((state: RootState) => state.user);
   const dispatch = useDispatch<AppDispatch>();
-  const navigate = useNavigate();
 
   // Fetch cart on load
   useEffect(() => {
@@ -78,19 +77,7 @@ const Cart = () => {
     }
   };
 
-  // Handle checkout
-  const handleCheckout = () => {
 
-    if (user?.uid) {
-      // Send cart items to the server for checkout
-      navigate("/checkout");
-    } else {
-      // Clear the guest cart and display a success message
-      alert("Please Login to checkout")
-      navigate("/checkout");
-
-    }
-  };
 
   // Get subtotal from Redux store
   const subtotal = useSelector((state: RootState) => state.cart.subtotal);
@@ -160,7 +147,7 @@ const Cart = () => {
 
               {/* Remove button */}
               <button
-                className="btn  ms-1 btn-sm btn-outline-danger"
+                className="btn ms-1 btn-sm btn-outline-danger"
                 onClick={() => handleRemoveFromCart(item.productId)}
               >
                 <i className="bi bi-trash"></i>
@@ -189,18 +176,9 @@ const Cart = () => {
           <p>R{subtotal && subtotal.toFixed(2)}</p>
         </div>
 
-        {/* Checkout Button */}
-        {cart && cart?.items.length > 0 && (
-          <button
-            className="Checkout-button btn btn-primary w-100"
-            onClick={handleCheckout}
-          >
-            Checkout
-          </button>
-        )}
       </div>
     </div>
   );
 };
 
-export default Cart;
+export default MiniCart;

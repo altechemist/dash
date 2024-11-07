@@ -4,7 +4,7 @@ import { createOrder } from "../store/orderSlice";
 import { fetchCart, setCart } from "../store/cartSlice";
 import PayPalButtonComponent from "../components/PayPalButtons";
 import { AppDispatch, RootState } from "../store/store";
-import Cart from "./Cart";
+import MiniCart from "./MiniCart";
 
 export default function Checkout() {
   // Component state for form data and validation
@@ -71,7 +71,7 @@ export default function Checkout() {
         type: "error",
         show: true,
       });
-      setIsFormValid(false); // Set form invalid if fields are empty
+      setIsFormValid(false); 
       return;
     }
 
@@ -165,7 +165,7 @@ export default function Checkout() {
     <div className="container">
       <div className="row g-3">
         <div className="col-md-6 col-lg-7">
-          <h4 className="mb-3">Billing address</h4>
+          <h3 className="mb-3">Billing Address</h3>
           {/* Alert Messages */}
           {alert.show && (
             <div
@@ -315,7 +315,8 @@ export default function Checkout() {
           )}
         </div>
         <div className="col-md-6 col-lg-5 order-md-last">
-          <Cart />
+        <h3 className="mb-4">Your Cart</h3>
+          <MiniCart />
         </div>
       </div>
     </div>

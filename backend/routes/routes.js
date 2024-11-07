@@ -3,7 +3,13 @@ const multer = require("multer");
 const {
   loginUser,
   registerUser,
+  logoutUser,
   resetEmail,
+  getUserProfile,
+  updateUserProfile,
+  changePassword,
+  addToWishlist,
+  removeFromWishlist,
 } = require("../controllers/userControllers");
 const {
   getAllProducts,
@@ -33,9 +39,15 @@ const upload = multer({ storage });
 const router = express.Router();
 
 // User routes
-router.post("/login", loginUser);
-router.post("/register", registerUser);
-router.post("/resetPassword", resetEmail);
+router.post("/users/login", loginUser);
+router.post("/users/register", registerUser);
+router.post("/users/logout", logoutUser)
+router.post("users/reset-password", resetEmail);
+router.get("/users/:id", getUserProfile);
+router.put("/users/:id", updateUserProfile);
+router.put("/users/:id/wishlist/add", addToWishlist);
+router.put("/users/:id/wishlist/remove")
+
 
 // Product routes
 router.get("/products", getAllProducts);

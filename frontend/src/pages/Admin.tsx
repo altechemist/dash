@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import {
   fetchAllProducts,
-  addProduct,
+  createProduct,
   updateProduct,
   deleteProduct,
 } from "../store/productSlice";
@@ -132,8 +132,8 @@ const AdminPage = () => {
     });
   };
 
-  const handleAddProduct = () => {
-    dispatch(addProduct(newProduct));
+  const handlecreateProduct = () => {
+    dispatch(createProduct(newProduct));
     setNewProduct({
       name: "",
       brand: "",
@@ -454,7 +454,7 @@ const AdminPage = () => {
               onClick={
                 editingProduct
                   ? () => handleUpdateProduct(editingProduct)
-                  : handleAddProduct
+                  : handlecreateProduct
               }
             >
               {editingProduct ? "Update Product" : "Add Product"}

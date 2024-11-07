@@ -34,7 +34,7 @@ const PayPalButtonComponent: React.FC<PayPalButtonComponentProps> = ({
   const { user } = useSelector((state: RootState) => state.user);
 
   // Function to create the order in PayPal
-  const onCreateOrder = (data: any, actions: any) => {
+  const onCreateOrder = ( actions: any) => {
     // Check if subtotal is valid and greater than zero
     
     if (!Number(subtotal) || Number(subtotal) <= 0) {
@@ -43,13 +43,13 @@ const PayPalButtonComponent: React.FC<PayPalButtonComponentProps> = ({
     }
 
     // Ensure two decimal precision for subtotal
-    const totalAmount = subtotal.toFixed(2); // Round to 2 decimal places
+    const totalAmount = subtotal.toFixed(2); 
 
     return actions.order.create({
       purchase_units: [
         {
           amount: {
-            value: totalAmount, // Use rounded value
+            value: totalAmount,
           },
         },
       ],
@@ -57,7 +57,7 @@ const PayPalButtonComponent: React.FC<PayPalButtonComponentProps> = ({
   };
 
   // Function to handle the approval of the order
-  const onApproveOrder = (data: any, actions: any) => {
+  const onApproveOrder = ( actions: any) => {
     setLoading(true);
     return actions.order
       .capture()

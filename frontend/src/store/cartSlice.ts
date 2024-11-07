@@ -1,10 +1,5 @@
 import { createSlice, PayloadAction } from "@reduxjs/toolkit";
-import {
-  doc,
-  getDoc,
-  setDoc,
-} from "firebase/firestore";
-import { db } from '../../config/firebase';
+import axios from "axios";
 import { AppDispatch } from "./store";
 
 // Define interfaces for Cart and CartItem
@@ -35,7 +30,9 @@ const initialState: CartState = {
   subtotal: 0,
 };
 
-// Create the cart slice
+// Get API base URL from the environment
+const API_URL = import.meta.env.VITE_API_URL || "http://localhost:3001";  // Fallback to localhost for local dev
+
 const cartSlice = createSlice({
   name: 'cart',
   initialState,
@@ -48,47 +45,43 @@ const cartSlice = createSlice({
       state.cart = action.payload;
       state.loading = false;
       state.error = null;
+      // Recalculate subtotal when cart is set
+      if (state.cart) {
+        state.subtotal = calculateSubtotal(state.cart); // Call the helper here
+      }
     },
     setError(state, action: PayloadAction<string | null>) {
       state.error = action.payload;
       state.loading = false;
     },
     setSubtotal(state) {
-      // Ensure cart and items are available before calculating
-      if (state.cart && state.cart.items) {
-        state.subtotal = state.cart.items.reduce((total: number, item: { productPrice: number; quantity: number }) => {
-          return total + item.productPrice * item.quantity;
-        }, 0);
-      } else {
-        state.subtotal = 0;
+      if (state.cart) {
+        state.subtotal = calculateSubtotal(state.cart); // Recalculate subtotal here as well
       }
-      state.error = null;
     },
   },
 });
 
-// Fetch the user's cart from Firestore
+// Helper function to calculate the subtotal based on cart items
+const calculateSubtotal = (cart: Cart): number => {
+  if (!cart || !cart.items || cart.items.length === 0) {
+    return 0;
+  }
+  return cart.items.reduce((total, item) => total + item.productPrice * item.quantity, 0);
+};
+
+// Fetch the user's cart from the API
 export const fetchCart = (userId: string) => async (dispatch: AppDispatch) => {
   dispatch(cartSlice.actions.setLoading());
   try {
-    const docRef = doc(db, "carts", userId);
-    const docSnap = await getDoc(docRef);
-
-    if (docSnap.exists()) {
-      const cartData = docSnap.data() as Cart;
-      dispatch(cartSlice.actions.setCart(cartData));
-    } else {
-      // If no cart exists, create a new empty cart
-      const emptyCart: Cart = { userId, items: [] };
-      await setDoc(docRef, emptyCart);
-      dispatch(cartSlice.actions.setCart(emptyCart));
-    }
+    const response = await axios.get(`${API_URL}/api/carts/${userId}`);
+    dispatch(cartSlice.actions.setCart(response.data.cart));
   } catch (error) {
-    dispatch(cartSlice.actions.setError((error as Error).message));
+    dispatch(cartSlice.actions.setError(error instanceof Error ? error.message : "Failed to fetch cart"));
   }
 };
 
-// Adds to cart
+// Add to the cart via the API (or local storage for guests)
 export const addToCart = (
   productId: string, 
   productName: string, 
@@ -103,15 +96,11 @@ export const addToCart = (
     if (!userId) {
       // Handle guest users - cart stored locally
       const localCart: Cart = JSON.parse(localStorage.getItem('guestCart') || '{"items": []}');
-
-      // Check if the item already exists in the cart
       const existingItemIndex = localCart.items.findIndex((item: CartItem) => item.productId === productId);
-      
+
       if (existingItemIndex > -1) {
-        // Update quantity if item exists
         localCart.items[existingItemIndex].quantity += quantity;
       } else {
-        // Add new item for guest, including all details
         localCart.items.push({ 
           productId, 
           productName, 
@@ -121,115 +110,59 @@ export const addToCart = (
         });
       }
 
-      // Save updated cart to localStorage with all item details
       localStorage.setItem('guestCart', JSON.stringify(localCart));
-
-      // Update the Redux store with the local cart
-      dispatch(cartSlice.actions.setCart(localCart));
-
+      dispatch(cartSlice.actions.setCart(localCart)); // Recalculate subtotal after adding item
     } else {
-      // Handle authenticated users - cart stored in Firestore
-      const docRef = doc(db, "carts", userId);
-      const docSnap = await getDoc(docRef);
-    
-      if (docSnap.exists()) {
-        const cart = docSnap.data() as Cart;
-        const existingItemIndex = cart.items.findIndex((item: CartItem) => item.productId === productId);
-        
-        if (existingItemIndex > -1) {
-          // Update quantity if item exists
-          cart.items[existingItemIndex].quantity += quantity;
-        } else {
-          // Add new item to Firestore cart, including all details
-          cart.items.push({ 
-            productId, 
-            productName, 
-            productPrice, 
-            productImage, 
-            quantity 
-          });
-        }
-        
-        await setDoc(docRef, cart);
-        dispatch(cartSlice.actions.setCart(cart));
-      } else {
-        // Create a new cart if it doesn't exist in Firestore
-        const newCart: Cart = { userId, items: [{ 
-          productId, 
-          productName, 
-          productPrice, 
-          productImage, 
-          quantity,
-        }] };
-        await setDoc(docRef, newCart);
-        dispatch(cartSlice.actions.setCart(newCart));
-      }
+      // Handle authenticated users - cart stored via API
+      const response = await axios.post(`${API_URL}/api/carts/${userId}/add`, { 
+        productId, 
+        productName, 
+        productPrice, 
+        productImage, 
+        quantity 
+      });
+
+      dispatch(cartSlice.actions.setCart(response.data.cart)); // Recalculate subtotal after adding item
     }
   } catch (error) {
-    dispatch(cartSlice.actions.setError((error as Error).message));
+    dispatch(cartSlice.actions.setError(error instanceof Error ? error.message : "Failed to add to cart"));
   }
 };
 
-// Remove an item from the cart
+// Remove an item from the cart via the API (or local storage for guests)
 export const removeFromCart = (userId: string | undefined, productId: string) => async (dispatch: AppDispatch) => {
   dispatch(cartSlice.actions.setLoading());
 
   try {
     if (userId) {
-      // Handle authenticated users - cart stored in Firestore
-      const docRef = doc(db, "carts", userId);
-      const docSnap = await getDoc(docRef);
-
-      if (docSnap.exists()) {
-        const cart = docSnap.data() as Cart;
-        cart.items = cart.items.filter(item => item.productId !== productId);
-
-        // Save updated cart in Firestore
-        await setDoc(docRef, cart);
-        dispatch(cartSlice.actions.setCart(cart));
-      } else {
-        dispatch(cartSlice.actions.setError("Cart not found."));
-      }
+      // Handle authenticated users - cart stored via API
+      const response = await axios.post(`${API_URL}/api/carts/${userId}/remove`, { productId });
+      dispatch(cartSlice.actions.setCart(response.data.cart)); // Recalculate subtotal after removing item
     } else {
-      // Handle guest users
+      // Handle guest users - cart stored in localStorage
       const localCart: Cart = JSON.parse(localStorage.getItem("guestCart") || '{"items": []}');
       localCart.items = localCart.items.filter(item => item.productId !== productId);
-      console.log(localCart)
 
-      // Save updated cart to localStorage
       localStorage.setItem("guestCart", JSON.stringify(localCart));
-      dispatch(cartSlice.actions.setCart(localCart));
+      dispatch(cartSlice.actions.setCart(localCart)); // Recalculate subtotal after removing item
     }
   } catch (error) {
-    dispatch(cartSlice.actions.setError((error as Error).message));
+    dispatch(cartSlice.actions.setError(error instanceof Error ? error.message : "Failed to remove from cart"));
   }
 };
 
-
-// Update the quantity of a cart item
+// Update the quantity of a cart item via the API (or local storage for guests)
 export const updateCartItemQuantity = (userId: string | undefined, productId: string, quantity: number) => async (dispatch: AppDispatch) => {
   dispatch(cartSlice.actions.setLoading());
 
   try {
     if (userId) {
-      // Handle authenticated users - cart stored in Firestore
-      const docRef = doc(db, "carts", userId);
-      const docSnap = await getDoc(docRef);
-
-      if (docSnap.exists()) {
-        const cart = docSnap.data() as Cart;
-        const existingItemIndex = cart.items.findIndex(item => item.productId === productId);
-
-        if (existingItemIndex > -1) {
-          cart.items[existingItemIndex].quantity = quantity;
-          await setDoc(docRef, cart);
-          dispatch(cartSlice.actions.setCart(cart));
-        } else {
-          dispatch(cartSlice.actions.setError("Product not found in cart."));
-        }
-      } else {
-        dispatch(cartSlice.actions.setError("Cart not found."));
-      }
+      // Handle authenticated users - cart stored via API
+      const response = await axios.post(`${API_URL}/api/carts/${userId}/update`, { 
+        productId, 
+        quantity 
+      });
+      dispatch(cartSlice.actions.setCart(response.data.cart));
     } else {
       // Handle guest users - cart stored in localStorage
       const localCart: Cart = JSON.parse(localStorage.getItem("guestCart") || '{"items": []}');
@@ -244,47 +177,40 @@ export const updateCartItemQuantity = (userId: string | undefined, productId: st
       }
     }
   } catch (error) {
-    dispatch(cartSlice.actions.setError((error as Error).message));
+    dispatch(cartSlice.actions.setError(error instanceof Error ? error.message : "Failed to update item quantity"));
   }
 };
 
-
-// Sync local data with firebase
-export const syncCartWithFirestore = async (userId: string, dispatch: AppDispatch) => {
+// Sync local data with the API for authenticated users
+export const syncCartWithApi = async (userId: string, dispatch: AppDispatch) => {
   const localCart: Cart = JSON.parse(localStorage.getItem('guestCart') || '{"items": []}');
-
+  
   if (localCart.items.length > 0) {
-    const docRef = doc(db, "carts", userId);
-    const docSnap = await getDoc(docRef);
+    try {
+      const response = await axios.post(`${API_URL}/api/carts/${userId}/sync`, { items: localCart.items });
+      
+      // Remove local cart after syncing
+      localStorage.removeItem('guestCart');
+      
+      // Dispatch the updated cart from the API to Redux
+      dispatch(cartSlice.actions.setCart(response.data.cart)); // Recalculate subtotal after syncing cart
+    } catch (error) {
+      dispatch(cartSlice.actions.setError(error instanceof Error ? error.message : "Failed to sync cart"));
+    }
+  }
+};
 
-    const firestoreCart = docSnap.exists() ? docSnap.data() as Cart : { userId, items: [] };
-
-    localCart.items.forEach((localItem: CartItem) => { 
-      const existingItemIndex = firestoreCart.items.findIndex(item => item.productId === localItem.productId);
-      if (existingItemIndex > -1) {
-        firestoreCart.items[existingItemIndex].quantity += localItem.quantity;
-      } else {
-        firestoreCart.items.push(localItem);
-      }
-    });
-
-    // Save the merged cart to Firestore
-    await setDoc(docRef, firestoreCart);
-
-    // Remove local cart from localStorage
-    localStorage.removeItem('guestCart');
-
-    // Dispatch the updated cart to Redux store
-    dispatch(cartSlice.actions.setCart(firestoreCart));
+// Fetch the user's cart if available (called on app load)
+export const fetchCartOnLoad = (userId: string | undefined) => async (dispatch: AppDispatch) => {
+  if (userId) {
+    // Fetch cart from API if user is authenticated
+    dispatch(fetchCart(userId));
+  } else {
+    // For guest users, load the local cart
+    const localCart: Cart = JSON.parse(localStorage.getItem('guestCart') || '{"items": []}');
+    dispatch(cartSlice.actions.setCart(localCart)); // Recalculate subtotal on load
   }
 };
 
 export const { setLoading, setCart, setError, setSubtotal } = cartSlice.actions;
-
-// Subtotal calculation based on the current state
-export const calculateSubtotal = (cart: Cart) => {
-  const sub = cart.items.reduce((total, item) => total + item.productPrice * item.quantity, 0);
-  return sub.toFixed(2);
-};
-
 export default cartSlice.reducer;

@@ -145,7 +145,7 @@ export default function Nav() {
                       </Link>
                     </li>
                     <li>
-                      <Link className="dropdown-item" to="/another-action">
+                      <Link className="dropdown-item" to="/register">
                         Register
                       </Link>
                     </li>
@@ -153,7 +153,7 @@ export default function Nav() {
                       <hr className="dropdown-divider" />
                     </li>
                     <li>
-                      <Link className="dropdown-item" to="/something-else">
+                      <Link className="dropdown-item" to="/logout">
                         Logout
                       </Link>
                     </li>
@@ -175,7 +175,7 @@ export default function Nav() {
           </div>
           <div
             className="offcanvas offcanvas-end bg-white text-dark"
-            tabIndex={-1}
+            tabIndex={1}
             id="offcanvasDarkCart"
             aria-labelledby="offcanvasDarkCartLabel"
           >

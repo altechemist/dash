@@ -1,15 +1,8 @@
 import { createSlice, PayloadAction } from "@reduxjs/toolkit";
-import {
-  collection,
-  doc,
-  addDoc,
-  getDoc,
-  getDocs,
-  updateDoc,
-} from "firebase/firestore";
-import { db } from '../../config/firebase';
+import axios from "axios";
 import { AppDispatch } from "./store";
 
+// Define interfaces for Order and related entities
 interface OrderItem {
   productId: string;
   quantity: number;
@@ -49,6 +42,9 @@ const initialState: OrderState = {
   error: null,
 };
 
+// Define API URL (adjust it as per your environment setup)
+const API_URL = import.meta.env.VITE_API_URL || "http://localhost:3001";  // Fallback to localhost
+
 const orderSlice = createSlice({
   name: "orders",
   initialState,
@@ -83,81 +79,60 @@ const orderSlice = createSlice({
   },
 });
 
-// Fetch all orders
+// Fetch all orders from the API
 export const fetchAllOrders = () => async (dispatch: AppDispatch) => {
   dispatch(orderSlice.actions.setLoading());
   try {
-    const querySnapshot = await getDocs(collection(db, "orders"));
-    const orders = querySnapshot.docs.map((doc) => ({
-      id: doc.id,
-      ...doc.data(),
-    })) as Order[];
-    dispatch(orderSlice.actions.setOrders(orders));
+    const response = await axios.get(`${API_URL}/api/orders`);
+    dispatch(orderSlice.actions.setOrders(response.data.orders));
   } catch (error) {
-    dispatch(orderSlice.actions.setError((error as Error).message));
+    dispatch(orderSlice.actions.setError(error instanceof Error ? error.message : "Failed to fetch orders"));
   }
 };
 
-// Create a new order
+// Create a new order through the API
 export const createOrder = (order: Omit<Order, "id" | "createdAt" | "updatedAt">) => async (dispatch: AppDispatch) => {
-    dispatch(orderSlice.actions.setLoading());
-    try {
-      const newOrder: Omit<Order, "id"> = {
-        ...order,
-        status: "Pending",
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      };
-      
-      const docRef = await addDoc(collection(db, "orders"), newOrder);
-      
-      // Create the full order object with the new ID
-      const createdOrder: Order = {
-        ...newOrder,
-        id: docRef.id, // Assign the generated document ID
-      };
-      
-      dispatch(orderSlice.actions.addOrderToState(createdOrder));
-    } catch (error) {
-      dispatch(orderSlice.actions.setError((error as Error).message));
-    }
-  };
-  
-// Update order status
+  dispatch(orderSlice.actions.setLoading());
+  try {
+    const newOrder = {
+      ...order,
+      status: "Pending",
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+
+    const response = await axios.post(`${API_URL}/api/orders`, newOrder);
+    const createdOrder: Order = { ...newOrder, id: response.data.id }; // Assuming response includes new order ID
+
+    dispatch(orderSlice.actions.addOrderToState(createdOrder));
+  } catch (error) {
+    dispatch(orderSlice.actions.setError(error instanceof Error ? error.message : "Failed to create order"));
+  }
+};
+
+// Update the order status through the API
 export const updateOrderStatus = (id: string, status: "Pending" | "Canceled" | "Completed") => async (dispatch: AppDispatch) => {
   dispatch(orderSlice.actions.setLoading());
   try {
-    const docRef = doc(db, "orders", id);
-    const docSnap = await getDoc(docRef);
+    const response = await axios.put(`${API_URL}/api/orders/${id}`, { status, updatedAt: new Date() });
 
-    if (docSnap.exists()) {
-      await updateDoc(docRef, { status, updatedAt: new Date() });
-      const updatedOrder = { id, ...docSnap.data(), status } as Order;
-      dispatch(orderSlice.actions.updateOrderInState(updatedOrder));
-    } else {
-      dispatch(orderSlice.actions.setError("Order not found"));
-    }
+    const updatedOrder: Order = { ...response.data, id }; // Assuming the updated data is returned
+    dispatch(orderSlice.actions.updateOrderInState(updatedOrder));
   } catch (error) {
-    dispatch(orderSlice.actions.setError((error as Error).message));
+    dispatch(orderSlice.actions.setError(error instanceof Error ? error.message : "Failed to update order status"));
   }
 };
 
-// Cancel an order
+// Cancel an order via the API
 export const cancelOrder = (id: string) => async (dispatch: AppDispatch) => {
   dispatch(orderSlice.actions.setLoading());
   try {
-    const docRef = doc(db, "orders", id);
-    const docSnap = await getDoc(docRef);
+    const response = await axios.put(`${API_URL}/api/orders/${id}/cancel`, { updatedAt: new Date() });
 
-    if (docSnap.exists()) {
-      await updateDoc(docRef, { status: "Canceled", updatedAt: new Date() });
-      const canceledOrder = { id, ...docSnap.data(), status: "Canceled" } as Order;
-      dispatch(orderSlice.actions.updateOrderInState(canceledOrder));
-    } else {
-      dispatch(orderSlice.actions.setError("Order not found"));
-    }
+    const canceledOrder: Order = { ...response.data, status: "Canceled", id };
+    dispatch(orderSlice.actions.updateOrderInState(canceledOrder));
   } catch (error) {
-    dispatch(orderSlice.actions.setError((error as Error).message));
+    dispatch(orderSlice.actions.setError(error instanceof Error ? error.message : "Failed to cancel order"));
   }
 };
 
