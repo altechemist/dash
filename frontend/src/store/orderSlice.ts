@@ -43,7 +43,7 @@ const initialState: OrderState = {
 };
 
 // Define API URL (adjust it as per your environment setup)
-const API_URL = import.meta.env.VITE_API_URL || "http://localhost:3001";  // Fallback to localhost
+const API_URL =  "http://localhost:3001";  // Fallback to localhost
 
 const orderSlice = createSlice({
   name: "orders",

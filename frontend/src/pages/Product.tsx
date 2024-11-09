@@ -98,7 +98,7 @@ export default function ProductPage() {
           <h4 className="text-muted">{product.brand}</h4>
           <p><strong>SKU:</strong> {product.sku}</p>
           <p><strong>Product Code:</strong> {product.productCode}</p>
-          <p><strong>Price:</strong> ${product.price}</p>
+          <p><strong>Price:</strong> R{product.price}</p>
           <p><strong>Category:</strong> {product.category} {">"} {product.subCategory}</p>
 
           {/* Size Selector */}

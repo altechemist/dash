@@ -80,15 +80,13 @@ const Cart = () => {
 
   // Handle checkout
   const handleCheckout = () => {
-
     if (user?.uid) {
       // Send cart items to the server for checkout
       navigate("/checkout");
     } else {
       // Clear the guest cart and display a success message
-      alert("Please Login to checkout")
+      alert("Please Login to checkout");
       navigate("/checkout");
-
     }
   };
 
@@ -114,17 +112,18 @@ const Cart = () => {
         {cart.items.map((item: CartItem) => (
           <div
             key={item.productId}
-            className="Cart-item d-flex align-items-center justify-content-between"
+            className="Cart-item d-flex align-items-center justify-content-between py-2 border-bottom"
           >
             <div className="d-flex align-items-center">
               <img
-                className="img-fluid"
-                style={{ width: "7rem", height: "7rem", objectFit: "contain" }}
+                className="img-fluid rounded-4"
                 src={item.productImage || productImage}
                 alt="Product"
               />
               <div className="Cart-information">
-                <p className="ms-2">{item.productName}</p>
+                <p className="ms-2 card-title mb-2 fw-2 fw-bold">
+                  {item.productName}
+                </p>
                 <p className="ms-2">
                   R{item.productPrice} x {item.quantity} = R
                   {(item.productPrice * item.quantity).toFixed(2)}
@@ -168,6 +167,7 @@ const Cart = () => {
             </div>
           </div>
         ))}
+
       </div>
     );
   };

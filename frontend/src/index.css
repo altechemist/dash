@@ -55,3 +55,9 @@
   height: 20rem !important;
   object-fit: cover;
 }
+
+.cart-items img {
+  width: 4rem;
+  height: 4rem;
+  object-fit: cover;
+}

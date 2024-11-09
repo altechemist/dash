@@ -22,14 +22,10 @@ const firebaseConfig: FirebaseConfig = {
     appId: import.meta.env.VITE_FIREBASE_APP_ID,
 };
 
-// Log the Firebase configuration to the console
-console.log("Firebase Configuration:", firebaseConfig);
 
 // Initialize Firebase only if no apps have been initialized
 const app: FirebaseApp = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0];
 export const db: Firestore = getFirestore(app);
 
-// Log the Firestore instance to check if it's initialized correctly
-console.log("Firestore Instance:", db);
 
 export const auth: Auth = getAuth(app);
